@@ -50,9 +50,11 @@ jobs:
       - name: Import project
         run: ./godot --headless --editor --path . --quit
       - name: Export debug APK
+        shell: bash
         run: |
+          set -o pipefail
           mkdir -p build
-          ./godot --headless --path . --export-debug "Android" build/LouFN-OG-debug.apk
+          ./godot --headless --verbose --path . --export-debug "Android" build/LouFN-OG-debug.apk 2>&1 | tee build/export.log
       - uses: actions/upload-artifact@v4
         with:
           name: LouFN-OG-debug-apk
