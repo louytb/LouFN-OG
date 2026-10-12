@@ -18,7 +18,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 12266719
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0 ndk;23.2.8568313 cmake;3.10.2'
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0 ndk;23.2.8568313 cmake;3.22.1'
           accept-android-sdk-licenses: true
       - name: Download Godot and export templates
         shell: bash
@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;23.2.8568313" "cmake;3.10.2"
+          sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;23.2.8568313" "cmake;3.22.1"
           test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
           test -d "$ANDROID_HOME/platforms/android-35"
           test -d "$ANDROID_HOME/ndk/23.2.8568313"
