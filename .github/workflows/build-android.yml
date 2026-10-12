@@ -18,7 +18,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 12266719
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0 ndk;23.2.8568313 cmake;3.10.2'
           accept-android-sdk-licenses: true
       - name: Download Godot and export templates
         shell: bash
@@ -36,10 +36,12 @@ jobs:
         shell: bash
         run: |
           set -e
-          sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;23.2.8568313" "cmake;3.10.2"
           test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
           test -d "$ANDROID_HOME/platforms/android-35"
-          echo "Android SDK OK: $ANDROID_HOME"
+          test -d "$ANDROID_HOME/ndk/23.2.8568313"
+          test -d "$ANDROID_HOME/cmake/3.10.2"
+          echo "Android SDK, NDK and CMake OK: $ANDROID_HOME"
       - name: Configure Android SDK and debug signing
         shell: bash
         run: |
@@ -68,6 +70,7 @@ jobs:
           mkdir -p build
           cp "$HOME/.android/debug.keystore" "$RUNNER_TEMP/debug.keystore"
           ./godot --headless --verbose --path . --export-debug "Android" build/LouFN-OG-debug.apk 2>&1 | tee build/export.log
+          test -s build/LouFN-OG-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: LouFN-OG-debug-apk
