@@ -32,6 +32,14 @@ jobs:
           mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
           unzip -q templates.tpz -d templates
           cp templates/templates/* "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
+      - name: Verify Android SDK packages
+        shell: bash
+        run: |
+          set -e
+          sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          test -d "$ANDROID_HOME/platforms/android-35"
+          echo "Android SDK OK: $ANDROID_HOME"
       - name: Configure Android SDK and debug signing
         shell: bash
         run: |
