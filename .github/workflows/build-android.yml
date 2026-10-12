@@ -32,14 +32,20 @@ jobs:
           mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
           unzip -q templates.tpz -d templates
           cp templates/templates/* "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
-      - name: Configure Android SDK paths
+      - name: Configure Android SDK and debug signing
+        shell: bash
         run: |
-          mkdir -p "$HOME/.config/godot"
+          set -e
+          mkdir -p "$HOME/.config/godot" "$HOME/.android"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
           cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
           [resource]
           export/android/android_sdk_path = "$ANDROID_HOME"
           export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
           EOF
       - name: Import project
         run: ./godot --headless --editor --path . --quit
