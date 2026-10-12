@@ -40,7 +40,7 @@ jobs:
           test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
           test -d "$ANDROID_HOME/platforms/android-35"
           test -d "$ANDROID_HOME/ndk/23.2.8568313"
-          test -d "$ANDROID_HOME/cmake/3.10.2"
+          test -d "$ANDROID_HOME/cmake/3.22.1"
           echo "Android SDK, NDK and CMake OK: $ANDROID_HOME"
       - name: Configure Android SDK and debug signing
         shell: bash
