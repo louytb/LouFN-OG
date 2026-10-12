@@ -51,9 +51,14 @@ jobs:
         run: ./godot --headless --editor --path . --quit
       - name: Export debug APK
         shell: bash
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
           set -o pipefail
           mkdir -p build
+          cp "$HOME/.android/debug.keystore" "$RUNNER_TEMP/debug.keystore"
           ./godot --headless --verbose --path . --export-debug "Android" build/LouFN-OG-debug.apk 2>&1 | tee build/export.log
       - uses: actions/upload-artifact@v4
         with:
