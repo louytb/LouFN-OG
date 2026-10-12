@@ -1,0 +1,16 @@
+config_version=5
+
+[application]
+config/name="LouFN OG"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+config/description="Original retro battle arena prototype"
+
+[display]
+window/size/viewport_width=960
+window/size/viewport_height=540
+window/handheld/orientation=1
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
