@@ -195,7 +195,7 @@ class MainActivity : Activity() {
                     if (buildVersionCode > 0L && installedVersionCode() == buildVersionCode) {
                         launchGame()
                     } else {
-                        installBuild(uri)
+                        installBuild(uri, item.optString("sha256", ""))
                     }
                 }
             }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -214,12 +214,9 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun verifyBuild(uriString: String, expectedHash: String) {
-        if (expectedHash.isBlank()) {
-            Toast.makeText(this, "Aucune empreinte enregistrée. Réimporte cet APK pour le vérifier.", Toast.LENGTH_LONG).show()
-            return
-        }
-        try {
+    private fun verifyBuildFile(uriString: String, expectedHash: String): Boolean {
+        if (expectedHash.isBlank()) return false
+        return try {
             val digest = MessageDigest.getInstance("SHA-256")
             contentResolver.openInputStream(Uri.parse(uriString)).use { input ->
                 requireNotNull(input) { "Fichier inaccessible" }
@@ -231,15 +228,20 @@ class MainActivity : Activity() {
                 }
             }
             val actualHash = digest.digest().joinToString("") { "%02x".format(it) }
-            val matches = actualHash.equals(expectedHash, ignoreCase = true)
-            Toast.makeText(
-                this,
-                if (matches) "Vérification réussie : APK inchangé." else "ATTENTION : l'empreinte ne correspond plus. Réimporte le fichier.",
-                Toast.LENGTH_LONG
-            ).show()
+            actualHash.equals(expectedHash, ignoreCase = true)
         } catch (_: Exception) {
-            Toast.makeText(this, "Fichier inaccessible. Réimporte cet APK.", Toast.LENGTH_LONG).show()
+            false
         }
+    }
+
+    private fun verifyBuild(uriString: String, expectedHash: String) {
+        val matches = verifyBuildFile(uriString, expectedHash)
+        Toast.makeText(
+            this,
+            if (matches) "Vérification réussie : APK inchangé."
+            else "Vérification impossible ou empreinte différente. Réimporte le fichier.",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     private fun removeBuild(index: Int) {
