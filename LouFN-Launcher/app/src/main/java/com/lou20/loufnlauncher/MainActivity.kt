@@ -1,6 +1,7 @@
 package com.lou20.loufnlauncher
 
 import android.app.Activity
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -266,10 +267,43 @@ class MainActivity : Activity() {
                 return
             }
             val uri = Uri.parse(uriString)
-            startActivity(Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, apkType)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            })
+            val installer = packageManager.packageInstaller
+            val fileSize = contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+            if (fileSize <= 0L) {
+                Toast.makeText(this, "Taille de l'APK impossible à lire.", Toast.LENGTH_LONG).show()
+                return
+            }
+            val sessionParams = android.content.pm.PackageInstaller.SessionParams(
+                android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
+            ).apply {
+                setAppPackageName(gamePackage)
+                setSize(fileSize)
+            }
+            val sessionId = installer.createSession(sessionParams)
+            try {
+                installer.openSession(sessionId).use { session ->
+                    contentResolver.openInputStream(uri).use { input ->
+                        requireNotNull(input) { "APK inaccessible" }
+                        session.openWrite("fortnite.apk", 0, fileSize).use { output ->
+                            input.copyTo(output)
+                            session.fsync(output)
+                        }
+                    }
+                    val callback = Intent(this, InstallStatusReceiver::class.java)
+                        .setAction(InstallStatusReceiver.ACTION_INSTALL_STATUS)
+                    val pending = PendingIntent.getBroadcast(
+                        this,
+                        sessionId,
+                        callback,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                    )
+                    session.commit(pending.intentSender)
+                }
+                Toast.makeText(this, "Installation Android lancée. Confirme la demande affichée.", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                try { installer.abandonSession(sessionId) } catch (_: Exception) {}
+                throw e
+            }
         } catch (_: Exception) {
             Toast.makeText(this, "APK inaccessible. Réimporte ce fichier.", Toast.LENGTH_LONG).show()
         }
