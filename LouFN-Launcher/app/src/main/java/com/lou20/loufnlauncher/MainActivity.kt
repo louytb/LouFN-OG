@@ -72,7 +72,7 @@ class MainActivity : Activity() {
         root.addView(ScrollView(this).apply { addView(buildsView) },
             LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(TextView(this).apply {
-            text = "La bibliothèque garde les références aux APK d'origine. Android n'autorise qu'une seule installation Fortnite à la fois : installer une autre build remplace la version actuelle. Les anciennes versions peuvent ne plus fonctionner ou ne plus se connecter."
+            text = "LouFN conserve les références aux APK importés et peut vérifier leur intégrité. Android doit installer un APK pour l'exécuter : cette bibliothèque ne lance pas directement un jeu non installé."
             textSize = 11f
             gravity = Gravity.CENTER
             setTextColor(Color.GRAY)
@@ -187,15 +187,10 @@ class MainActivity : Activity() {
                 setPadding(0, 4, 0, 8)
             }, lp())
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            val buildCode = item.optLong("versionCode", -1L)
-            val installedCode = installedVersionCode()
-            val isThisBuildInstalled = buildCode >= 0L && installedCode != null && installedCode == buildCode
             row.addView(Button(this@MainActivity).apply {
-                text = if (isThisBuildInstalled) "JOUER" else "INSTALLER"
+                text = "VÉRIFIER"
                 isAllCaps = false
-                setOnClickListener {
-                    if (isThisBuildInstalled) launchGame() else installBuild(uri)
-                }
+                setOnClickListener { verifyBuild(uri, item.optString("sha256", "")) }
             }, LinearLayout.LayoutParams(0, -2, 1f))
             row.addView(Button(this@MainActivity).apply {
                 text = "Retirer"
@@ -204,6 +199,34 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(-2, -2))
             card.addView(row, lp())
             buildsView.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10 })
+        }
+    }
+
+    private fun verifyBuild(uriString: String, expectedHash: String) {
+        if (expectedHash.isBlank()) {
+            Toast.makeText(this, "Aucune empreinte enregistrée. Réimporte cet APK pour le vérifier.", Toast.LENGTH_LONG).show()
+            return
+        }
+        try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            contentResolver.openInputStream(Uri.parse(uriString)).use { input ->
+                requireNotNull(input) { "Fichier inaccessible" }
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            val actualHash = digest.digest().joinToString("") { "%02x".format(it) }
+            val matches = actualHash.equals(expectedHash, ignoreCase = true)
+            Toast.makeText(
+                this,
+                if (matches) "Vérification réussie : APK inchangé." else "ATTENTION : l'empreinte ne correspond plus. Réimporte le fichier.",
+                Toast.LENGTH_LONG
+            ).show()
+        } catch (_: Exception) {
+            Toast.makeText(this, "Fichier inaccessible. Réimporte cet APK.", Toast.LENGTH_LONG).show()
         }
     }
 
