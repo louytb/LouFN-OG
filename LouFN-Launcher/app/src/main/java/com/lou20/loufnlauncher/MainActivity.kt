@@ -187,6 +187,18 @@ class MainActivity : Activity() {
                 setPadding(0, 4, 0, 8)
             }, lp())
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            val buildVersionCode = item.optLong("versionCode", -1L)
+            row.addView(Button(this@MainActivity).apply {
+                text = if (buildVersionCode > 0L && installedVersionCode() == buildVersionCode) "JOUER" else "INSTALLER"
+                isAllCaps = false
+                setOnClickListener {
+                    if (buildVersionCode > 0L && installedVersionCode() == buildVersionCode) {
+                        launchGame()
+                    } else {
+                        installBuild(uri)
+                    }
+                }
+            }, LinearLayout.LayoutParams(0, -2, 1f))
             row.addView(Button(this@MainActivity).apply {
                 text = "VÉRIFIER"
                 isAllCaps = false
