@@ -111,15 +111,16 @@ class MainActivity : Activity() {
     private fun validateAndInstallApk(apkUri: Uri) {
         var tempApk: File? = null
         try {
-            tempApk = File.createTempFile("loufn-check-", ".apk", cacheDir)
+            val tempFile = File.createTempFile("loufn-check-", ".apk", cacheDir)
+            tempApk = tempFile
             contentResolver.openInputStream(apkUri).use { input ->
                 if (input == null) throw IllegalStateException("Fichier illisible")
-                tempApk.outputStream().use { output -> input.copyTo(output) }
+                tempFile.outputStream().use { output -> input.copyTo(output) }
             }
 
             @Suppress("DEPRECATION")
             val archiveInfo = packageManager.getPackageArchiveInfo(
-                tempApk.absolutePath,
+                tempFile.absolutePath,
                 PackageManager.GET_ACTIVITIES
             )
             if (archiveInfo == null) {
