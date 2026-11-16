@@ -102,13 +102,14 @@ class MainActivity : Activity() {
     private fun validateAndSave(uri: Uri, flags: Int) {
         var temp: File? = null
         try {
-            temp = File.createTempFile("loufn-", ".apk", cacheDir)
+            val tempFile = File.createTempFile("loufn-", ".apk", cacheDir)
+            temp = tempFile
             contentResolver.openInputStream(uri).use { input ->
                 requireNotNull(input) { "Fichier illisible" }
-                temp.outputStream().use { output -> input.copyTo(output) }
+                tempFile.outputStream().use { output -> input.copyTo(output) }
             }
             @Suppress("DEPRECATION")
-            val info = packageManager.getPackageArchiveInfo(temp.absolutePath, 0)
+            val info = packageManager.getPackageArchiveInfo(tempFile.absolutePath, 0)
             if (info?.packageName != gamePackage) {
                 Toast.makeText(this, "Ce fichier n'est pas un APK Fortnite Android valide.", Toast.LENGTH_LONG).show()
                 return
