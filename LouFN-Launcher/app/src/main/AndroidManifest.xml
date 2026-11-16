@@ -9,6 +9,9 @@
         android:label="LouFN Launcher"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
+        <receiver
+            android:name=".InstallStatusReceiver"
+            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
