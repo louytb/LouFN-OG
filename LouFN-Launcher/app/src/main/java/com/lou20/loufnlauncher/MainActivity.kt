@@ -252,8 +252,12 @@ class MainActivity : Activity() {
         renderBuilds()
     }
 
-    private fun installBuild(uriString: String) {
+    private fun installBuild(uriString: String, expectedHash: String) {
         try {
+            if (!verifyBuildFile(uriString, expectedHash)) {
+                Toast.makeText(this, "APK modifié ou inaccessible. Réimporte la build avant installation.", Toast.LENGTH_LONG).show()
+                return
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
                 Toast.makeText(this, "Autorise LouFN Launcher à installer des APK, puis réessaie.", Toast.LENGTH_LONG).show()
                 startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
