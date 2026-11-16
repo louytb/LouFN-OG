@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
+import android.provider.Settings
 import android.view.Gravity
 import android.widget.*
 import org.json.JSONArray
@@ -167,10 +169,15 @@ class MainActivity : Activity() {
                 setTextColor(Color.WHITE)
             }, lp())
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            val buildVersion = item.optString("version", "Version inconnue")
+            val installed = installedVersion()
+            val isThisBuildInstalled = installed != null && installed == buildVersion
             row.addView(Button(this@MainActivity).apply {
-                text = "Installer cette build"
+                text = if (isThisBuildInstalled) "JOUER" else "INSTALLER"
                 isAllCaps = false
-                setOnClickListener { installBuild(uri) }
+                setOnClickListener {
+                    if (isThisBuildInstalled) launchGame() else installBuild(uri)
+                }
             }, LinearLayout.LayoutParams(0, -2, 1f))
             row.addView(Button(this@MainActivity).apply {
                 text = "Retirer"
@@ -192,6 +199,13 @@ class MainActivity : Activity() {
 
     private fun installBuild(uriString: String) {
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+                Toast.makeText(this, "Autorise LouFN Launcher à installer des APK, puis réessaie.", Toast.LENGTH_LONG).show()
+                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+                return
+            }
             val uri = Uri.parse(uriString)
             startActivity(Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, apkType)
@@ -202,16 +216,21 @@ class MainActivity : Activity() {
         }
     }
 
+    @Suppress("DEPRECATION")
+    private fun installedVersion(): String? {
+        return try { packageManager.getPackageInfo(gamePackage, 0).versionName } catch (_: Exception) { null }
+    }
+
     private fun refresh() {
-        val info = try { packageManager.getPackageInfo(gamePackage, 0) } catch (_: Exception) { null }
-        if (info == null) {
+        val version = installedVersion()
+        if (version == null) {
             status.text = "Aucune build Fortnite installée."
             launchButton.isEnabled = false
         } else {
-            @Suppress("DEPRECATION")
-            status.text = "BUILD INSTALLÉE : " + (info.versionName ?: "Version inconnue")
+            status.text = "BUILD INSTALLÉE : $version"
             launchButton.isEnabled = true
         }
+        if (::buildsView.isInitialized) renderBuilds()
     }
 
     private fun launchGame() {
