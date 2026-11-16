@@ -13,6 +13,7 @@ import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.security.MessageDigest
 
 class MainActivity : Activity() {
     private val gamePackage = "com.epicgames.fortnite"
@@ -122,6 +123,9 @@ class MainActivity : Activity() {
                 Toast.makeText(this, "Android ne permet pas de mémoriser l'accès à ce fichier. Il faudra peut-être le réimporter.", Toast.LENGTH_LONG).show()
             }
             val version = info.versionName ?: "Version inconnue"
+            @Suppress("DEPRECATION")
+            val versionCode = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+            val sha256 = sha256Of(tempFile)
             val label = info.applicationInfo?.loadLabel(packageManager)?.toString() ?: "Fortnite"
             val old = readBuilds()
             val saved = JSONArray()
@@ -129,7 +133,12 @@ class MainActivity : Activity() {
                 val item = old.optJSONObject(i) ?: continue
                 if (item.optString("uri") != uri.toString()) saved.put(item)
             }
-            saved.put(JSONObject().put("label", label).put("version", version).put("uri", uri.toString()))
+            saved.put(JSONObject()
+                .put("label", label)
+                .put("version", version)
+                .put("versionCode", versionCode)
+                .put("sha256", sha256)
+                .put("uri", uri.toString()))
             prefs().edit().putString("builds", saved.toString()).apply()
             Toast.makeText(this, "Build $version ajoutée à la bibliothèque.", Toast.LENGTH_LONG).show()
             renderBuilds()
@@ -168,10 +177,19 @@ class MainActivity : Activity() {
                 textSize = 14f
                 setTextColor(Color.WHITE)
             }, lp())
+            card.addView(TextView(this).apply {
+                val code = item.optLong("versionCode", -1L)
+                val hash = item.optString("sha256", "")
+                text = "VersionCode : " + (if (code >= 0L) code.toString() else "non vérifié") +
+                    (if (hash.isNotBlank()) "\nSHA-256 : " + hash.take(16) + "…" else "\nAncienne entrée : réimporte l'APK pour vérifier son intégrité.")
+                textSize = 10f
+                setTextColor(Color.LTGRAY)
+                setPadding(0, 4, 0, 8)
+            }, lp())
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            val buildVersion = item.optString("version", "Version inconnue")
-            val installed = installedVersion()
-            val isThisBuildInstalled = installed != null && installed == buildVersion
+            val buildCode = item.optLong("versionCode", -1L)
+            val installedCode = installedVersionCode()
+            val isThisBuildInstalled = buildCode >= 0L && installedCode != null && installedCode == buildCode
             row.addView(Button(this@MainActivity).apply {
                 text = if (isThisBuildInstalled) "JOUER" else "INSTALLER"
                 isAllCaps = false
@@ -219,6 +237,27 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     private fun installedVersion(): String? {
         return try { packageManager.getPackageInfo(gamePackage, 0).versionName } catch (_: Exception) { null }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun installedVersionCode(): Long? {
+        return try {
+            val info = packageManager.getPackageInfo(gamePackage, 0)
+            if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+        } catch (_: Exception) { null }
+    }
+
+    private fun sha256Of(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().buffered().use { input ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun refresh() {
