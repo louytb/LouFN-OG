@@ -7,196 +7,224 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 class MainActivity : Activity() {
-    private val fortnitePackage = "com.epicgames.fortnite"
-    private val apkMimeType = "application/vnd.android.package-archive"
+    private val gamePackage = "com.epicgames.fortnite"
+    private val apkType = "application/vnd.android.package-archive"
     private lateinit var status: TextView
-    private lateinit var playButton: Button
-    private lateinit var importButton: Button
+    private lateinit var launchButton: Button
+    private lateinit var buildsView: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.rgb(10, 12, 20)
         window.navigationBarColor = Color.rgb(10, 12, 20)
-        window.decorView.systemUiVisibility = 0
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(28, 36, 28, 36)
+            setPadding(20, 22, 20, 18)
             setBackgroundColor(Color.rgb(10, 12, 20))
         }
-
-        val title = TextView(this).apply {
+        root.addView(TextView(this).apply {
             text = "LOUFN"
-            textSize = 38f
+            textSize = 36f
+            gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
+        }, lp())
+        root.addView(TextView(this).apply {
+            text = "BIBLIOTHÈQUE DE BUILDS"
+            textSize = 14f
             gravity = Gravity.CENTER
-        }
-        val subtitle = TextView(this).apply {
-            text = "GESTIONNAIRE DE BUILDS"
-            textSize = 15f
-            letterSpacing = 0.25f
             setTextColor(Color.rgb(90, 170, 255))
-            gravity = Gravity.CENTER
-        }
+        }, lp())
         status = TextView(this).apply {
-            textSize = 16f
+            textSize = 14f
+            gravity = Gravity.CENTER
             setTextColor(Color.LTGRAY)
+            setPadding(0, 16, 0, 12)
+        }
+        root.addView(status, lp())
+        root.addView(Button(this).apply {
+            text = "＋ IMPORTER UNE BUILD APK"
+            isAllCaps = false
+            setOnClickListener { pickApk() }
+        }, lp())
+        launchButton = Button(this).apply {
+            text = "LANCER LA BUILD INSTALLÉE"
+            isAllCaps = false
+            setOnClickListener { launchGame() }
+        }
+        root.addView(launchButton, lp())
+        root.addView(TextView(this).apply {
+            text = "MES BUILDS"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setPadding(0, 18, 0, 8)
+        }, lp())
+        buildsView = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(ScrollView(this).apply { addView(buildsView) },
+            LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(TextView(this).apply {
+            text = "La bibliothèque garde les références aux APK d'origine. Android n'autorise qu'une seule installation Fortnite à la fois : installer une autre build remplace la version actuelle. Les anciennes versions peuvent ne plus fonctionner ou ne plus se connecter."
+            textSize = 11f
             gravity = Gravity.CENTER
-            setPadding(0, 28, 0, 24)
-        }
-        importButton = Button(this).apply {
-            text = "IMPORTER UNE BUILD APK"
-            isAllCaps = false
-            setOnClickListener { chooseBuildApk() }
-        }
-        playButton = Button(this).apply {
-            text = "LANCER FORTNITE"
-            isAllCaps = false
-            setOnClickListener { launchFortnite() }
-        }
-        val refresh = Button(this).apply {
-            text = "Vérifier la version installée"
-            isAllCaps = false
-            setOnClickListener { refreshStatus() }
-        }
-        val note = TextView(this).apply {
-            text = "Importe un APK Fortnite officiel que tu possèdes. Android te demandera de confirmer l'installation. Une nouvelle version remplace l'ancienne ; les builds ne peuvent pas cohabiter avec le même identifiant."
-            textSize = 12f
             setTextColor(Color.GRAY)
-            gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 0)
-        }
-
-        root.addView(title, match())
-        root.addView(subtitle, match())
-        root.addView(status, match())
-        root.addView(importButton, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10 })
-        root.addView(playButton, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10 })
-        root.addView(refresh, match())
-        root.addView(note, match())
+            setPadding(0, 10, 0, 0)
+        }, lp())
         setContentView(root)
-        refreshStatus()
+        refresh()
+        renderBuilds()
     }
 
-    private fun match() = LinearLayout.LayoutParams(-1, -2)
+    private fun lp() = LinearLayout.LayoutParams(-1, -2)
 
-    private fun chooseBuildApk() {
+    private fun pickApk() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = apkMimeType
+            type = apkType
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
-        try {
-            startActivityForResult(intent, REQUEST_PICK_APK)
-        } catch (_: Exception) {
-            Toast.makeText(this, "Impossible d'ouvrir le sélecteur de fichiers.", Toast.LENGTH_LONG).show()
-        }
+        startActivityForResult(intent, 4102)
     }
 
-    @Deprecated("Using the activity result API keeps compatibility with the minimum Android version")
+    @Deprecated("Legacy picker callback for Android compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQUEST_PICK_APK || resultCode != RESULT_OK) return
-        val apkUri: Uri = data?.data ?: return
-        validateAndInstallApk(apkUri)
+        if (requestCode != 4102 || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        validateAndSave(uri, data.flags)
     }
 
-    private fun validateAndInstallApk(apkUri: Uri) {
-        var tempApk: File? = null
+    private fun validateAndSave(uri: Uri, flags: Int) {
+        var temp: File? = null
         try {
-            val tempFile = File.createTempFile("loufn-check-", ".apk", cacheDir)
-            tempApk = tempFile
-            contentResolver.openInputStream(apkUri).use { input ->
-                if (input == null) throw IllegalStateException("Fichier illisible")
-                tempFile.outputStream().use { output -> input.copyTo(output) }
+            temp = File.createTempFile("loufn-", ".apk", cacheDir)
+            contentResolver.openInputStream(uri).use { input ->
+                requireNotNull(input) { "Fichier illisible" }
+                temp.outputStream().use { output -> input.copyTo(output) }
             }
-
             @Suppress("DEPRECATION")
-            val archiveInfo = packageManager.getPackageArchiveInfo(
-                tempFile.absolutePath,
-                PackageManager.GET_ACTIVITIES
-            )
-            if (archiveInfo == null) {
-                Toast.makeText(this, "Ce fichier APK est invalide ou illisible.", Toast.LENGTH_LONG).show()
+            val info = packageManager.getPackageArchiveInfo(temp.absolutePath, 0)
+            if (info?.packageName != gamePackage) {
+                Toast.makeText(this, "Ce fichier n'est pas un APK Fortnite Android valide.", Toast.LENGTH_LONG).show()
                 return
             }
-            if (archiveInfo.packageName != fortnitePackage) {
-                Toast.makeText(
-                    this,
-                    "Ce n'est pas un APK Fortnite Android reconnu. Aucun changement effectué.",
-                    Toast.LENGTH_LONG
-                ).show()
-                return
+            try {
+                contentResolver.takePersistableUriPermission(uri, flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {
+                Toast.makeText(this, "Android ne permet pas de mémoriser l'accès à ce fichier. Il faudra peut-être le réimporter.", Toast.LENGTH_LONG).show()
             }
-
-            val version = archiveInfo.versionName ?: "version inconnue"
-            Toast.makeText(
-                this,
-                "Build Fortnite détectée : $version. Confirme l'installation dans Android.",
-                Toast.LENGTH_LONG
-            ).show()
-
-            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(apkUri, apkMimeType)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(installIntent)
-        } catch (_: SecurityException) {
-            Toast.makeText(this, "LouFN n'a pas pu lire ce fichier. Choisis un APK accessible.", Toast.LENGTH_LONG).show()
-        } catch (_: Exception) {
-            Toast.makeText(this, "Impossible de vérifier cet APK.", Toast.LENGTH_LONG).show()
-        } finally {
-            tempApk?.delete()
-        }
-    }
-
-    private fun refreshStatus() {
-        val info = try {
-            packageManager.getPackageInfo(fortnitePackage, 0)
-        } catch (_: PackageManager.NameNotFoundException) {
-            null
-        } catch (_: Exception) {
-            null
-        }
-
-        if (info == null) {
-            status.text = "Aucune build Fortnite détectée comme installée."
-            playButton.isEnabled = false
-        } else {
-            @Suppress("DEPRECATION")
             val version = info.versionName ?: "Version inconnue"
-            status.text = "Build installée détectée\nVersion : $version"
-            playButton.isEnabled = true
+            val label = info.applicationInfo?.loadLabel(packageManager)?.toString() ?: "Fortnite"
+            val old = readBuilds()
+            val saved = JSONArray()
+            for (i in 0 until old.length()) {
+                val item = old.optJSONObject(i) ?: continue
+                if (item.optString("uri") != uri.toString()) saved.put(item)
+            }
+            saved.put(JSONObject().put("label", label).put("version", version).put("uri", uri.toString()))
+            prefs().edit().putString("builds", saved.toString()).apply()
+            Toast.makeText(this, "Build $version ajoutée à la bibliothèque.", Toast.LENGTH_LONG).show()
+            renderBuilds()
+        } catch (_: Exception) {
+            Toast.makeText(this, "Impossible de lire ou vérifier cet APK.", Toast.LENGTH_LONG).show()
+        } finally {
+            temp?.delete()
         }
     }
 
-    private fun launchFortnite() {
-        val launchIntent: Intent? = packageManager.getLaunchIntentForPackage(fortnitePackage)
-        if (launchIntent == null) {
-            Toast.makeText(this, "Impossible de lancer Fortnite. Vérifie son installation.", Toast.LENGTH_LONG).show()
-            refreshStatus()
+    private fun prefs() = getSharedPreferences("loufn_library", MODE_PRIVATE)
+    private fun readBuilds() = try { JSONArray(prefs().getString("builds", "[]")) } catch (_: Exception) { JSONArray() }
+
+    private fun renderBuilds() {
+        buildsView.removeAllViews()
+        val list = readBuilds()
+        if (list.length() == 0) {
+            buildsView.addView(TextView(this).apply {
+                text = "Aucune build enregistrée. Importe un APK pour commencer."
+                textSize = 13f
+                setTextColor(Color.LTGRAY)
+                setPadding(4, 12, 4, 12)
+            })
             return
         }
+        for (index in 0 until list.length()) {
+            val item = list.optJSONObject(index) ?: continue
+            val uri = item.optString("uri")
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(12, 10, 12, 10)
+                setBackgroundColor(Color.rgb(25, 30, 44))
+            }
+            card.addView(TextView(this).apply {
+                text = item.optString("label", "Fortnite") + "  •  " + item.optString("version", "Version inconnue")
+                textSize = 14f
+                setTextColor(Color.WHITE)
+            }, lp())
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            row.addView(Button(this@MainActivity).apply {
+                text = "Installer cette build"
+                isAllCaps = false
+                setOnClickListener { installBuild(uri) }
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(Button(this@MainActivity).apply {
+                text = "Retirer"
+                isAllCaps = false
+                setOnClickListener { removeBuild(index) }
+            }, LinearLayout.LayoutParams(-2, -2))
+            card.addView(row, lp())
+            buildsView.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10 })
+        }
+    }
+
+    private fun removeBuild(index: Int) {
+        val old = readBuilds()
+        val next = JSONArray()
+        for (i in 0 until old.length()) if (i != index) old.optJSONObject(i)?.let { next.put(it) }
+        prefs().edit().putString("builds", next.toString()).apply()
+        renderBuilds()
+    }
+
+    private fun installBuild(uriString: String) {
         try {
-            startActivity(launchIntent)
+            val uri = Uri.parse(uriString)
+            startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, apkType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            })
         } catch (_: Exception) {
-            Toast.makeText(this, "Le lancement de Fortnite a échoué.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "APK inaccessible. Réimporte ce fichier.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun refresh() {
+        val info = try { packageManager.getPackageInfo(gamePackage, 0) } catch (_: Exception) { null }
+        if (info == null) {
+            status.text = "Aucune build Fortnite installée."
+            launchButton.isEnabled = false
+        } else {
+            @Suppress("DEPRECATION")
+            status.text = "BUILD INSTALLÉE : " + (info.versionName ?: "Version inconnue")
+            launchButton.isEnabled = true
+        }
+    }
+
+    private fun launchGame() {
+        val intent = packageManager.getLaunchIntentForPackage(gamePackage)
+        if (intent == null) {
+            Toast.makeText(this, "Fortnite ne peut pas être lancé.", Toast.LENGTH_LONG).show()
+            refresh()
+        } else try { startActivity(intent) } catch (_: Exception) {
+            Toast.makeText(this, "Échec du lancement.", Toast.LENGTH_LONG).show()
         }
     }
 
     override fun onResume() {
         super.onResume()
-        if (::status.isInitialized) refreshStatus()
-    }
-
-    companion object {
-        private const val REQUEST_PICK_APK = 4102
+        if (::status.isInitialized) refresh()
     }
 }
